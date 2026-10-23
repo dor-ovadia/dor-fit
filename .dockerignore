@@ -1,0 +1,14 @@
+.git
+.gitignore
+node_modules
+data
+*.db
+*.db-*
+.env
+.env.*
+*.log
+# one-off data-collection tools, not needed to run the server
+*_scrape.js
+build_*.py
+off_israel.py
+*-foods.json
