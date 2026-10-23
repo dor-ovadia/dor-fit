@@ -23,6 +23,11 @@ const J = s => { try { return JSON.parse(s); } catch { return {}; } };
 const num = x => typeof x === 'number' && isFinite(x);
 const str = (x, n) => typeof x === 'string' && x.length <= n;
 const obj = x => x && typeof x === 'object' && !Array.isArray(x);
+// ids end up inside inline onclick="f('<id>')" handlers in the web app, so only allow characters that cannot break out of a quoted string
+const ID_RE = /^[A-Za-z0-9_.:-]{1,40}$/;
+const safeId = x => typeof x === 'string' && ID_RE.test(x);
+// every string "id" anywhere inside a document (days, exercises, meals...) must be a safe id
+const idsOk = (v, d = 0) => d > 8 ? true : Array.isArray(v) ? v.every(x => idsOk(x, d + 1)) : obj(v) ? Object.keys(v).every(k => (k !== 'id' || typeof v[k] !== 'string' || ID_RE.test(v[k])) && idsOk(v[k], d + 1)) : true;
 const fail = (status, msg) => { const e = new Error(msg); e.status = status; throw e; };
 
 const TF = ['water', 'ms', 'hist', 'cur', 'act', 'last', 'log', 'pr', 'chk', 'weights', 'checkin', 'lastDone', 'daily', 'day', 'reqs', 'steps', 'meas', 'cia', 'rtime', 'remOff', 'hs', 'rf']; // trainee-owned
@@ -336,17 +341,17 @@ app.delete('/api/users/:id', wrap((req, res) => {
 app.put('/api/library', wrap((req, res) => {
   auth(req, 'coach');
   const { progs, plans, exs, foods, msgs, rcps } = req.body || {};
-  const valid = (a, key) => Array.isArray(a) && a.length < 1000 && a.every(d => obj(d) && str(d.id, 40) && str(d.name, 120) && Array.isArray(d[key]));
+  const valid = (a, key) => Array.isArray(a) && a.length < 1000 && a.every(d => obj(d) && safeId(d.id) && idsOk(d) && str(d.name, 120) && Array.isArray(d[key]));
   if (!valid(progs, 'days') || !valid(plans, 'meals')) fail(400, 'נתונים לא תקינים');
   let cleanEx = null;
   if (exs !== undefined) {
-    if (!Array.isArray(exs) || exs.length > 1000 || !exs.every(d => obj(d) && str(d.id, 40) && str(d.n, 120))) fail(400, 'נתונים לא תקינים');
+    if (!Array.isArray(exs) || exs.length > 1000 || !exs.every(d => obj(d) && safeId(d.id) && str(d.n, 120))) fail(400, 'נתונים לא תקינים');
     const t = (v, m) => (typeof v === 'string' ? v.slice(0, m) : '');
     cleanEx = exs.map(d => ({ id: d.id, n: d.n, g: t(d.g, 30), sets: Math.max(0, Math.min(20, Number(d.sets) || 0)), rep: t(String(d.rep == null ? '' : d.rep), 20), rest: Math.max(0, Math.min(900, Number(d.rest) || 0)), tip: t(d.tip, 500), video: t(d.video, 300), xid: t(d.xid, 80) }));
   }
   let cleanMs = null;
   if (msgs !== undefined) {
-    if (!Array.isArray(msgs) || msgs.length > 60 || !msgs.every(d => obj(d) && str(d.id, 40))) fail(400, 'נתונים לא תקינים');
+    if (!Array.isArray(msgs) || msgs.length > 60 || !msgs.every(d => obj(d) && safeId(d.id))) fail(400, 'נתונים לא תקינים');
     const t = (v, m) => (typeof v === 'string' ? v.slice(0, m) : '');
     cleanMs = msgs.map(d => ({ id: d.id, n: t(d.n, 40), t: t(d.t, 600) }));
   }
@@ -358,7 +363,7 @@ app.put('/api/library', wrap((req, res) => {
   }
   let cleanFd = null;
   if (foods !== undefined) {
-    if (!Array.isArray(foods) || foods.length > 2000 || !foods.every(d => obj(d) && str(d.id, 40) && str(d.n, 120))) fail(400, 'נתונים לא תקינים');
+    if (!Array.isArray(foods) || foods.length > 2000 || !foods.every(d => obj(d) && safeId(d.id) && str(d.n, 120))) fail(400, 'נתונים לא תקינים');
     const m = x => Math.max(0, Math.min(5000, Math.round((Number(x) || 0) * 10) / 10));
     cleanFd = foods.map(d => ({ id: d.id, n: d.n, q: typeof d.q === 'string' ? d.q.slice(0, 30) : '', k: m(d.k), p: m(d.p), c: m(d.c), f: m(d.f), b: d.b === 'g' ? 'g' : 's', cat: typeof d.cat === 'string' ? d.cat.slice(0, 30) : '', pu: typeof d.pu === 'string' ? d.pu.slice(0, 30) : '', bc: /^\d{8,14}$/.test(String(d.bc || '')) ? String(d.bc) : '', u: Array.isArray(d.u) ? d.u.filter(x => obj(x) && str(x.n, 30) && num(x.g) && x.g > 0 && x.g <= 5000).slice(0, 12).map(x => ({ n: x.n, g: Math.round(x.g * 10) / 10 })) : [] }));
   }
