@@ -475,9 +475,9 @@ const setSteps=()=>{const u=me(),a=prompt('כמה צעדים עד עכשיו? (�
 let swapI=null,swapC=0,noteO=new Set(),addI=null,hx=null;
 const histOf=(u,n)=>(u.log||[]).slice().reverse().flatMap(l=>(l.items||[]).filter(it=>String(it.n).trim()===String(n).trim()).map(it=>({date:l.date,sets:it.sets||[]}))).slice(0,12);
 const openHist=(uid,n)=>{hx={uid,n};render()};
-function histSheet(){if(!hx)return '';const u=S.me&&me().role==='c'?U(hx.uid):me();if(!u)return '';const L=histOf(u,hx.n),ex=exOfName(hx.n),R=ex&&u.pr&&u.pr[ex.id],best=L.reduce((m,r)=>Math.max(m,...r.sets.map(x=>num(x[0]))),0);
+function histSheet(){if(!hx)return '';const u=S.me&&me().role==='c'?U(hx.uid):me();if(!u)return '';const L=histOf(u,hx.n),ex=exOfName(hx.n),R=ex&&u.pr&&u.pr[ex.id],bs=(R&&bestSet(R))||L.reduce((m,r)=>{r.sets.forEach(x=>{const w=num(x[0]),q=num(x[1]),v=w*q;if(w>0&&q>0&&(!m||v>m.v))m={w,r:q,v}});return m},null);
  return `<div class="sov" onclick="hx=null;render()"></div><div class="sheet"><div class="grab"></div><div class="row sp" style="margin-bottom:6px"><div><b style="font-size:17px">${esc(hx.n)}</b><div class="mut">היסטוריית משקלים${S.me&&me().role==='c'?' · '+esc(u.name):''}</div></div><button class="g" style="padding:6px 10px" onclick="hx=null;render()">✕</button></div>
- ${best?`<div class="mut" style="margin-bottom:6px">שיא משקל: <b style="color:var(--acc)">${R&&R.maxW?R.maxW:best} ק״ג</b></div>`:''}
+ ${bs?`<div class="mut" style="margin-bottom:6px">שיא (נפח סט): <b style="color:var(--acc)">${bs.w} ק״ג × ${bs.r}</b> · ${bs.v.toLocaleString()} ק״ג</div>`:''}
  ${L.length?L.map(r=>`<div class="al" style="cursor:default"><div style="flex:1"><b>${new Date(r.date).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})}</b><div class="mm" style="font-size:13px;color:var(--ink)">${r.sets.map(x=>num(x[0])+'×'+num(x[1])).join(' · ')||'—'}</div></div></div>`).join(''):'<div class="card mut" style="margin-top:10px">עדיין אין היסטוריה לתרגיל הזה.</div>'}</div>`}
 const exOfName=n=>{for(const p of S.progs)for(const d of p.days)for(const e of d.ex){if(String(e.n).trim()===String(n).trim())return e}return null};
 const nIc={sw:'<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',nt:'<svg viewBox="0 0 24 24"><path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',hs:'<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'};
@@ -567,10 +567,10 @@ let mo=null,setFrom='home',libQ='';
 const ICO={trend:'<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',rec:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3"/>',ci:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M9 15l2 2 4-4"/>',supp:'<rect x="3" y="9" width="18" height="7" rx="3.5"/><path d="M12 9v7"/>',cardio:'<circle cx="13" cy="5" r="2"/><path d="M9 21l3-6-3-3 2-4 4 2 2 3M7 12l4-2"/>',prog:'<path d="M3 17l5-6 4 4 8-9M15 6h5v5"/>',lib:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M10 9l5 3-5 3z"/>',rc:'<path d="M3 12h18a9 9 0 01-18 0zM8 8c0-1.5 1-2 1-3.5M12 8c0-1.5 1-2 1-3.5M16 8c0-1.5 1-2 1-3.5"/>',acct:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'};
 const mrow=(k,l,fn)=>`<div class="li" role="button" tabindex="0" onclick="${fn||`mo='${k}';render();toTop()`}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg><div style="flex:1"><b>${l}</b></div><span class="chev">‹</span></div>`;
 const mback=t=>`<div class="top row sp"><h1>${t}</h1><button class="g" onclick="mo=null;render();toTop()">חזרה</button></div>`;
-function recView(u){const pr=u.pr||{},rows=Object.entries(pr).filter(([id,r])=>r&&r.maxW>0).map(([id,r])=>({id,n:exName(id)||'תרגיל',w:r.maxW,r:r.byW[r.maxW]||0,top:Object.entries(r.byW).sort((a,b)=>b[0]-a[0]).slice(0,3)})).sort((a,b)=>a.n.localeCompare(b.n,'he'));
+function recView(u){const pr=u.pr||{},rows=Object.entries(pr).filter(([id,r])=>r&&bestSet(r)).map(([id,r])=>{const b=bestSet(r);return {id,n:exName(id)||'תרגיל',w:b.w,r:b.r,v:b.v,top:Object.entries(r.byW).filter(([w,q])=>num(w)>0&&num(q)>0).sort((a,b)=>num(b[0])*num(b[1])-num(a[0])*num(a[1])).slice(0,3)}}).sort((a,b)=>a.n.localeCompare(b.n,'he'));
  const recent=(u.log||[]).flatMap(l=>(l.prs||[]).map(p=>({...p,date:l.date}))).sort((a,b)=>b.date-a.date).slice(0,8);
- return `${recent.length?`<h2 class="sec" style="margin-top:0">שיאים אחרונים 🏆</h2><div class="card list">${recent.map(p=>`<div class="li" style="cursor:default"><div style="flex:1"><b>${esc(p.n)}</b><div class="mut">${new Date(p.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'})}</div></div><b style="color:var(--acc)">${p.w} ק״ג × ${p.r}</b></div>`).join('')}</div>`:''}
- <h2 class="sec" ${recent.length?'':'style="margin-top:0"'}>השיא שלי בכל תרגיל</h2>${rows.length?`<div class="card list">${rows.map(x=>`<div class="li" style="cursor:default"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b><div class="mut">${x.top.map(([w,r])=>w+'×'+r).join(' · ')}</div></div><b style="color:var(--acc);white-space:nowrap">${x.w} ק״ג × ${x.r}</b></div>`).join('')}</div>`:'<div class="card mut">עדיין אין שיאים. אחרי האימון הראשון הם יופיעו כאן.</div>'}`}
+ return `${recent.length?`<h2 class="sec" style="margin-top:0">שיאים אחרונים 🏆</h2><div class="card list">${recent.map(p=>`<div class="li" style="cursor:default"><div style="flex:1"><b>${esc(p.n)}</b><div class="mut">${new Date(p.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'})}</div></div><div style="text-align:end;white-space:nowrap"><b style="color:var(--acc)">${p.w} ק״ג × ${p.r}</b><div class="mut" style="font-size:12px">נפח ${(num(p.w)*num(p.r)).toLocaleString()} ק״ג</div></div></div>`).join('')}</div>`:''}
+ <h2 class="sec" ${recent.length?'':'style="margin-top:0"'}>השיא שלי בכל תרגיל</h2><div class="mut" style="margin:-4px 2px 8px;font-size:13px">השיא נקבע לפי נפח הסט: משקל × חזרות</div>${rows.length?`<div class="card list">${rows.map(x=>`<div class="li" style="cursor:default"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b><div class="mut">${x.top.map(([w,r])=>w+'×'+r).join(' · ')}</div></div><div style="text-align:end;white-space:nowrap"><b style="color:var(--acc)">${x.w} ק״ג × ${x.r}</b><div class="mut" style="font-size:12px">נפח ${x.v.toLocaleString()} ק״ג</div></div></div>`).join('')}</div>`:'<div class="card mut">עדיין אין שיאים. אחרי האימון הראשון הם יופיעו כאן.</div>'}`}
 function body(u){
  if(mo==='ci')return mback('צ׳ק-אינים קודמים')+ciHistory(u);
  if(mo==='supp')return mback('תוספים')+textCard(u.supp,'המאמן עדיין לא הוסיף המלצות על תוספים.');
@@ -846,7 +846,7 @@ function saveWorkout(){const u=me(),a=u.act,p=progOf(a.pid),d=effDay(u,p.days.fi
  u.hist[d.id]=u.hist[d.id]||{};u.pr=u.pr||{};const items=[],prs=[];
  d.ex.forEach(e=>{const l=c[e.id];if(!l)return;const done=l.sets.filter(x=>x.d&&!x.wu);if(done.length)u.hist[d.id][e.id]=done.map(x=>[x.w,x.r]);
   const R=u.pr[e.id]=u.pr[e.id]||{maxW:0,byW:{}};let top=null;
-  done.forEach(x=>{const w=num(x.w),r=num(x.r);if(x.pr&&(!top||w>top.w||(w===top.w&&r>top.r)))top={n:e.n,w,r};if(w>R.maxW)R.maxW=w;if(w>0&&r>(R.byW[w]||0))R.byW[w]=r});
+  done.forEach(x=>{const w=num(x.w),r=num(x.r);if(x.pr&&(!top||w*r>top.w*top.r))top={n:e.n,w,r};if(w>R.maxW)R.maxW=w;if(w>0&&r>(R.byW[w]||0))R.byW[w]=r});
   if(top)prs.push(top);items.push({n:e.n,g:e.g||libGroup(e.n)||'',sets:done.map(x=>[x.w,x.r,x.x]),note:l.note})});
  const rec={name:p.name+' · '+d.name,did:d.id,items,prs,vol:dayVol(u,d.id),mins:Math.max(1,Math.round((Date.now()-a.t0)/60000)),rpe:a.rpe,note:a.note||'',date:Date.now()};
  u.last=rec;(u.log=u.log||[]).push(rec);u.lastDone={pid:p.id,di:p.days.findIndex(x=>x.id===d.id)};delete u.cur[d.id];u.act=null;fin=false;u.lastTrain=0;rest=0;clearInterval(tick);pushCancel();OPN.clear();swo=null;open=null;cd=null;tab='home';save();if(prs.length){celeb='pr';celPR=prs}save();flash(prs.length?'האימון נשמר ✓ · שברת '+prs.length+' שיאים':'האימון נשמר ✓');toTop()}
@@ -1514,7 +1514,8 @@ function swapBox(u,d,e){const base=e.orig||e.id,b=(progOf(u.act.pid).days.find(x
 const repMin=r=>{const m=String(r||'').match(/\d+/);return m?+m[0]:1};
 function bestOf(u,did,eid,skip){const b={maxW:0,byW:{}},pr=(u.pr||{})[eid];if(pr){b.maxW=pr.maxW;Object.assign(b.byW,pr.byW)}
  ((u.cur[did]||{})[eid]||{sets:[]}).sets.forEach((x,i)=>{if(i===skip||!x.d||x.wu)return;const w=num(x.w),r=num(x.r);if(w>b.maxW)b.maxW=w;if(w>0&&r>(b.byW[w]||0))b.byW[w]=r});return b}
-function isPR(e,w,r,b){if(!b.maxW||w<=0||r<=0)return false;return (w>b.maxW&&r>=repMin(e&&e.rep))||(b.byW[w]!==undefined&&r>b.byW[w])}
+const bestSet=b=>{let o=null;Object.entries((b&&b.byW)||{}).forEach(([w,r])=>{const W=num(w),R=num(r),v=W*R;if(W>0&&R>0&&(!o||v>o.v||(v===o.v&&W>o.w)))o={w:W,r:R,v}});return o};
+function isPR(e,w,r,b){if(!b.maxW||w<=0||r<=0)return false;const bs=bestSet(b);return !!bs&&w*r>bs.v}
 const ssMid=(d,e)=>{const i=d.ex.findIndex(x=>x.id===e.id);return i>=0&&!!(d.ex[i+1]&&d.ex[i+1].ss)};
 const ssMidId=(did,eid)=>{for(const p of S.progs){const d=p.days.find(x=>x.id===did);if(d)return ssMid(d,{id:eid})}return false};
 function doneSet(did,eid,j,r){const u=me(),l=getLog(u,did,{id:eid}),s=l.sets[j],e=exOf(eid),wi=l.sets.slice(0,j).filter(x=>!x.wu).length,pv=s.wu?null:((u.hist[did]||{})[eid]||[])[wi];
@@ -1627,8 +1628,8 @@ async function pdfReport(uid){const u=U(uid);if(!u)return;flash('מכין דוח
  else T('עדיין לא הוזנו מדידות',W-P,y+60,F(500,28),'#6b769c');
  // PRs
  y=1285;T('שיאים אישיים (משקל מקסימלי)',W-P,y,F(800,36),'#142044');
- const pr=Object.entries(u.pr||{}).map(([id,v])=>{const e=exOf(id);return e&&v&&v.maxW?[e.n,v.maxW]:null}).filter(Boolean).sort((p,q)=>q[1]-p[1]).slice(0,4);
- if(pr.length)pr.forEach((p,i)=>{const yy=y+56+i*50;T('🏆 '+p[0],W-P,yy,F(600,28),'#142044');T(p[1]+' ק״ג',P,yy,F(800,28),'#3b6cf6','left')});else T('עדיין אין שיאים שמורים',W-P,y+60,F(500,28),'#6b769c');
+ const pr=Object.entries(u.pr||{}).map(([id,v])=>{const e=exOf(id),b=bestSet(v);return e&&b?[e.n,b.w+' ק״ג × '+b.r,b.v]:null}).filter(Boolean).sort((p,q)=>q[2]-p[2]).slice(0,4);
+ if(pr.length)pr.forEach((p,i)=>{const yy=y+56+i*50;T('🏆 '+p[0],W-P,yy,F(600,28),'#142044');T(p[1],P,yy,F(800,28),'#3b6cf6','left')});else T('עדיין אין שיאים שמורים',W-P,y+60,F(500,28),'#6b769c');
  T('הופק ע״י DOR FIT',W/2,H-30,F(500,20),'#9aa4cc','center');
  const du=cv.toDataURL('image/jpeg',.9),bin=atob(du.split(',')[1]),jb=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)jb[i]=bin.charCodeAt(i);
  const enc=s=>new TextEncoder().encode(s),parts=[],off=[];let pos=0;const add=d=>{const u8=typeof d==='string'?enc(d):d;parts.push(u8);pos+=u8.length};
