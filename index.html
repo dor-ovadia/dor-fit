@@ -545,6 +545,7 @@ const setv=(did,eid,j,k,v)=>{const u=me(),s=getLog(u,did,{id:eid}).sets[j];s[k]=
 /* quiet entry: store the value without re-rendering so the keyboard stays open; Enter moves weight -> reps -> RIR, Enter on RIR finishes the set */
 function sq(did,eid,j,k,v){const u=me(),s=getLog(u,did,{id:eid}).sets[j];s[k]=v;if(s.d&&!s.wu&&(k==='w'||k==='r'))s.pr=isPR(exOf(eid),num(s.w),num(s.r),bestOf(u,did,eid,j));save()}
 function sEnter(ev,el,did,eid,j){if(ev.key!=='Enter')return;ev.preventDefault();const row=el.closest('.set'),ins=row?Array.from(row.querySelectorAll('input')):[],i=ins.indexOf(el),nx=ins[i+1];
+ if(i===1&&nx){const s=getLog(me(),did,{id:eid}).sets[j];s.r=el.value;if(ins[0].value!=='')s.w=ins[0].value;if(!s.d){const e=exOf(eid);doneSet(did,eid,j,e?e.rest:60)}else render();const n=document.querySelectorAll('#ex-'+eid+' .set:not(.hd)')[j],x=n&&n.querySelectorAll('input')[2];if(x){x.focus();try{x.select()}catch(e){}}return}
  if(nx){nx.focus();try{nx.select()}catch(e){}return}
  el.blur();const s=getLog(me(),did,{id:eid}).sets[j];if(s.d){render();return}const e=exOf(eid);doneSet(did,eid,j,e?e.rest:60)}
 function wChange(did,eid,j,v){const u=me(),s=getLog(u,did,{id:eid}).sets[j];if(v!==''&&num(v)>0&&!s.d&&num(s.r)>0){s.w=v;const e=exOf(eid);doneSet(did,eid,j,e?e.rest:60);return}setv(did,eid,j,'w',v)}
@@ -709,7 +710,7 @@ function gStats(days){const m={};days.forEach(d=>d.ex.forEach(e=>{if(!e.n&&!e.g)
 function gSum(days,title){const m=gStats(days),ks=Object.keys(m).sort((a,b)=>m[b].s-m[a].s);if(!ks.length)return '';return `<div class="hd" style="margin:10px 0 6px">${title}</div>`+ks.map(k=>{const o=m[k];return `<div class="row sp" style="padding:7px 0;border-top:1px solid var(--line)"><b>${k}</b><span class="mut"><b style="color:var(--ink)">${o.s}</b> סטים · ${o.a===o.b?o.a:o.a+'–'+o.b} חזרות</span></div>`}).join('')}
 ['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
 document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});
-document.addEventListener('focusin',e=>{const t=e.target;if(t&&t.tagName==='INPUT'&&(t.type==='number'||/numeric|decimal/.test(t.getAttribute('inputmode')||''))){if(/^0([.,]0+)?$/.test(t.value)){t.value=''}else setTimeout(()=>{try{t.select()}catch(_){}},0)}});
+document.addEventListener('focusin',e=>{const t=e.target;if(t&&t.tagName==='INPUT'&&(t.type==='number'||/numeric|decimal/.test(t.getAttribute('inputmode')||''))){if(/^0([.,]0+)?$/.test(t.value)){t.value=''}else setTimeout(()=>{try{if(document.activeElement===t)t.select()}catch(_){}},0)}});
 let DG=null;
 function moveEx(i,to){const a=S.progs[pe]&&S.progs[pe].days[pd]&&S.progs[pe].days[pd].ex;if(!a||i===to||i<0||to<0||i>=a.length||to>=a.length)return;const [x]=a.splice(i,1);a.splice(to,0,x);if(a[0])a[0].ss=false;save();render()}
 function moveMeal(pi,i,to){const pl=S.plans[pi],a=pl&&pl.meals;if(!a||i===to||i<0||to<0||i>=a.length||to>=a.length)return;const [x]=a.splice(i,1);a.splice(to,0,x);
@@ -1656,14 +1657,16 @@ async function pdfReport(uid){const u=U(uid);if(!u)return;flash('מכין דוח
 let lastSig='',vinT=0,rinT=0;
 let rendering=false,rerender=false;
 function render(){if(rendering){rerender=true;return}rendering=true;try{doRender()}finally{rendering=false}if(rerender){rerender=false;render()}}
-function doRender(){const a=document.getElementById('app'),u=me(),f=document.activeElement&&document.activeElement.id;
+function setFocusInfo(){const e=document.activeElement;if(!e||e.tagName!=='INPUT')return null;const row=e.closest('.set'),ex=e.closest('.ex');if(!row||!ex||!ex.id)return null;return {ex:ex.id,r:Array.from(ex.querySelectorAll('.set:not(.hd)')).indexOf(row),i:Array.from(row.querySelectorAll('input')).indexOf(e),v:e.value}}
+function setFocusBack(f){if(!f||f.r<0)return;const ex=document.getElementById(f.ex),row=ex&&ex.querySelectorAll('.set:not(.hd)')[f.r],e=row&&row.querySelectorAll('input')[f.i];if(e){if(f.v!==undefined&&f.v!==e.value&&e.value==='')e.value=f.v;e.focus()}}
+function doRender(){const a=document.getElementById('app'),u=me(),f=document.activeElement&&document.activeElement.id,sf=setFocusInfo();
  let sig='';try{sig=[u&&u.id,tab,ct,sel,pm,lm,dtab,typeof mo!=='undefined'?mo:'',splash,inst].join('|')}catch(e){}
  const same=sig===lastSig;let sb=[],sc=[];if(same){sb=[...a.querySelectorAll('.bar i')].map(e=>e.style.width);sc=[...a.querySelectorAll('svg circle[stroke-dasharray]')].map(e=>[e.getAttribute('stroke-dasharray'),e.getAttribute('stroke-dashoffset')])}
  a.innerHTML=splash?splashHtml():!u?login():u.role==='c'?coach():trainee(u);if(offline&&u)a.insertAdjacentHTML('beforeend','<div class="off" role="status">אין חיבור לשרת. השינויים נשמרים במכשיר ויישלחו כשהחיבור יחזור</div>');if(inst)a.insertAdjacentHTML('beforeend',instHtml());
  if(u&&!splash&&!inst){const k=tipKey(u);if(k&&TIPS[k]&&!tipSeen(k)){const w=a.querySelector('.wrap');if(w)w.insertAdjacentHTML('afterbegin',tipHtml(k))}}
  if(same){const nb=[...a.querySelectorAll('.bar i')];if(nb.length===sb.length)nb.forEach((e,i)=>{const w=e.style.width;if(sb[i]!==w){e.style.width=sb[i];void e.offsetWidth;e.style.width=w}});const nc=[...a.querySelectorAll('svg circle[stroke-dasharray]')];if(nc.length===sc.length)nc.forEach((e,i)=>{const d=e.getAttribute('stroke-dasharray'),o=e.getAttribute('stroke-dashoffset');if(sc[i][0]!==d||sc[i][1]!==o){e.setAttribute('stroke-dasharray',sc[i][0]);if(sc[i][1]!==null)e.setAttribute('stroke-dashoffset',sc[i][1]);void e.getBoundingClientRect();e.setAttribute('stroke-dasharray',d);if(o!==null)e.setAttribute('stroke-dashoffset',o)}})}
  else{a.classList.add('vin','rin');clearTimeout(vinT);vinT=setTimeout(()=>a.classList.remove('vin'),450);clearTimeout(rinT);rinT=setTimeout(()=>a.classList.remove('rin'),1100)}
- lastSig=sig;if(f){const e=document.getElementById(f);if(e)e.focus()}}
+ lastSig=sig;if(f){const e=document.getElementById(f);if(e)e.focus()}else if(sf)setFocusBack(sf)}
 boot();
 </script>
 </body>
