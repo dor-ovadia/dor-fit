@@ -670,6 +670,43 @@ app.get('/api/backup/db', wrap(async (req, res) => {
   await db.backup(tmp);
   res.download(tmp, 'dorfit-' + new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' }) + '.db', () => { try { fs.unlinkSync(tmp); } catch (e) {} });
 }));
+/* ---------- one-time restore from a .db backup (needs RESTORE_TOKEN env; remove it after use) ---------- */
+app.get('/restore', (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>שחזור</title><body dir=rtl style="font-family:sans-serif;background:#050a18;color:#fff;padding:24px;max-width:480px;margin:auto"><h2>שחזור מגיבוי</h2>${process.env.RESTORE_TOKEN ? '' : '<p style="color:#f66">השחזור כבוי (אין RESTORE_TOKEN בשרת)</p>'}<p>קוד שחזור:</p><input id=t style="width:100%;padding:12px;font-size:16px"><p>קובץ גיבוי (.db):</p><input id=f type=file accept=".db" style="width:100%"><button id=b style="margin-top:20px;width:100%;padding:14px;font-size:18px;border:0;border-radius:12px;background:#4dd0ff">שחזר</button><p id=m></p><script>b.onclick=async()=>{const x=f.files[0];if(!x){m.textContent='בחר קובץ';return}m.textContent='מעלה...';try{const r=await fetch('/api/restore',{method:'POST',headers:{'x-restore-token':t.value.trim(),'Content-Type':'application/octet-stream'},body:x});const j=await r.json().catch(()=>({}));m.textContent=r.ok?'הצלחה! '+JSON.stringify(j.counts):'שגיאה: '+(j.error||r.status)}catch(e){m.textContent='שגיאה: '+e.message}}</script>`);
+});
+app.post('/api/restore', express.raw({ type: '*/*', limit: '200mb' }), wrap((req, res) => {
+  const tok = process.env.RESTORE_TOKEN;
+  const given = String(req.get('x-restore-token') || '');
+  if (!tok || given.length !== tok.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(tok))) fail(403, 'קוד שחזור שגוי');
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || buf.length < 1024 || buf.slice(0, 15).toString() !== 'SQLite format 3') fail(400, 'זה לא קובץ גיבוי תקין');
+  const tmp = path.join(require('os').tmpdir(), 'dorfit-restore-' + Date.now() + '.db');
+  fs.writeFileSync(tmp, buf);
+  const counts = {};
+  try {
+    const chk = new Database(tmp, { readonly: true });
+    const names = chk.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%'").all().map(r => r.name);
+    if (!names.includes('users') || !names.includes('docs')) { chk.close(); fail(400, 'חסרות טבלאות בקובץ'); }
+    chk.close();
+    db.exec("attach database '" + tmp.replace(/'/g, "''") + "' as bk");
+    try {
+      const mine = db.prepare("select name from main.sqlite_master where type='table' and name not like 'sqlite_%'").all().map(r => r.name);
+      db.transaction(() => {
+        for (const n of names) {
+          if (!mine.includes(n)) continue;
+          const cols = db.prepare(`pragma main.table_info("${n}")`).all().map(c => `"${c.name}"`);
+          const bcols = new Set(db.prepare(`pragma bk.table_info("${n}")`).all().map(c => `"${c.name}"`));
+          const use = cols.filter(c => bcols.has(c)).join(',');
+          db.exec(`delete from main."${n}"`);
+          db.exec(`insert into main."${n}"(${use}) select ${use} from bk."${n}"`);
+          counts[n] = db.prepare(`select count(*) c from main."${n}"`).get().c;
+        }
+      })();
+    } finally { db.exec('detach database bk'); }
+  } finally { try { fs.unlinkSync(tmp); } catch (e) {} }
+  console.log('[restore] done', JSON.stringify(counts));
+  res.json({ ok: true, counts });
+}));
 app.get('/api/export', wrap((req, res) => {
   auth(req, 'coach');
   res.set('Content-Disposition', 'attachment; filename="dorfit-backup-' + new Date().toISOString().slice(0, 10) + '.json"');
