@@ -36,11 +36,12 @@ const idsOk = (v, d = 0) => d > 8 ? true : Array.isArray(v) ? v.every(x => idsOk
 const fail = (status, msg) => { const e = new Error(msg); e.status = status; throw e; };
 
 const TF = ['water', 'ms', 'hist', 'cur', 'act', 'last', 'log', 'pr', 'chk', 'weights', 'checkin', 'lastDone', 'daily', 'day', 'reqs', 'steps', 'meas', 'cia', 'rtime', 'remOff', 'hs', 'rf']; // trainee-owned
-const CF = ['name', 'status', 'goal', 'block', 'coachNote', 'progs', 'plan', 'sgoal', 'cif', 'supp', 'cardio', 'phone', 'remT', 'sub', 'intk'];                                                          // coach-owned
+const CF = ['name', 'status', 'goal', 'block', 'coachNote', 'progs', 'plan', 'sgoal', 'cif', 'supp', 'cardio', 'phone', 'remT', 'sub', 'intk', 'cm'];                                                          // coach-owned
 const checks = {
   water: num, ms: arrMax(100), hist: objMax(5000), cur: objMax(500), act: objSmall, last: objSmall, log: arrMax(5000),
   pr: objMax(5000), chk: arrMax(2000), weights: arrMax(5000), checkin: objSmall, lastDone: objSmall, daily: objMax(5000), day: x => str(x, 12), reqs: arrMax(500), steps: x => num(x) && x >= 0 && x <= 200000, sgoal: x => num(x) && x >= 1000 && x <= 60000, cif: x => num(x) && x >= 0 && x <= 60, meas: x => Array.isArray(x) && x.length <= 400, cia: x => str(x, 12), rtime: x => str(x, 5) && /^\d\d:\d\d$/.test(x), remOff: x => typeof x === 'boolean', supp: x => str(x, 4000), cardio: x => str(x, 4000), phone: x => str(x, 20), sub: x => obj(x) && JSON.stringify(x).length < 2000, remT: x => str(x, 5) && (x === '' || /^\d\d:\d\d$/.test(x)),
   rf: x => Array.isArray(x) && x.length <= 60,
+  cm: x => Array.isArray(x) && x.length <= 400 && x.every(e => obj(e) && str(e.d, 12) && JSON.stringify(e).length < 2000),
   intk: x => x === null || (obj(x) && Object.keys(x).length <= 24 && Object.values(x).every(v => typeof v === 'string' && v.length <= 700)),
   hs: x => x === null || (obj(x) && str(x.d, 12) && num(x.h) && x.h >= 0 && x.h <= 24),
   name: x => str(x, 80) && x.trim().length > 0, status: x => ['פעיל', 'מושהה', 'ארכיון'].includes(x), goal: x => num(x) && x >= 500 && x <= 10000,
@@ -639,14 +640,20 @@ app.post('/api/push/cancel', wrap((req, res) => { auth(req); clearTimeout(restTi
 // ---------- progress photos ----------
 db.exec("create table if not exists photos(id text primary key, user_id text not null, ts integer not null, data blob not null)");
 app.post('/api/photos', wrap((req, res) => {
-  auth(req, 'trainee');
+  auth(req);
+  let owner = req.user.id;
+  if (req.user.role === 'coach') {
+    const uid = (req.body || {}).uid;
+    if (!safeId(uid) || !db.prepare("select 1 from users where id=? and role='trainee'").get(uid)) fail(400, 'מתאמן לא נמצא');
+    owner = uid;
+  }
   const d = (req.body || {}).data;
   if (typeof d !== 'string' || !d.startsWith('data:image/jpeg;base64,') || d.length > 650000) fail(400, 'תמונה לא תקינה');
   const buf = Buffer.from(d.slice(23), 'base64');
   if (buf.length < 200 || buf[0] !== 0xFF || buf[1] !== 0xD8) fail(400, 'תמונה לא תקינה');
   const id = 'ph' + crypto.randomBytes(8).toString('hex');
-  db.prepare('insert into photos(id,user_id,ts,data) values(?,?,?,?)').run(id, req.user.id, Date.now(), buf);
-  const all = db.prepare('select id from photos where user_id=? order by ts').all(req.user.id);
+  db.prepare('insert into photos(id,user_id,ts,data) values(?,?,?,?)').run(id, owner, Date.now(), buf);
+  const all = db.prepare('select id from photos where user_id=? order by ts').all(owner);
   all.slice(0, Math.max(0, all.length - 120)).forEach(r => db.prepare('delete from photos where id=?').run(r.id));
   res.json({ id });
 }));
